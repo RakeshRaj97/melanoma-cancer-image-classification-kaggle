@@ -9,10 +9,13 @@ import pandas as pd
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
-from torch.cuda import amp
+#from torch.cuda import amp
+#from apex import amp
+from sklearn import metrics
 
 from wtfml.data_loaders.image import ClassificationLoader
-
+from wtfml.utils import EarlyStopping
+from wtfml.engine import Engine
 class SEResNext50_32x4d(nn.Module):
     def __init__(self, pretrained="imagenet"):
         super(SEResNext50_32x4d, self).__init__()
@@ -22,17 +25,21 @@ class SEResNext50_32x4d(nn.Module):
         ](pretrained=pretrained)
         self.out = nn.Linear(2048, 1)
 
-    def forward(self, image):
-        bs, _, _ = image.shape
+    def forward(self, image, targets):
+        bs, _, _, _ = image.shape
         x = self.model.features(image)
         x = F.adaptive_avg_pool2d(x, 1)
         x = x.reshape(bs, -1)
         out = self.out(x)
-        return out
+        loss = nn.BCEWithLogitsLoss()(
+            out, targets.reshape(-1, 1).type_as(out)
+        )
+        return out, loss
 
-def run(fold):
+def train(fold):
     training_data_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/train_resized"
-    df = pd.read_csv("rgopala@farnarkle2:/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/train_folds.csv")
+    model_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch"
+    df = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/train_folds.csv")
     device = "cuda"
     epochs = 50
     train_bs = 32
@@ -70,7 +77,7 @@ def run(fold):
         augmentations=train_aug
     )
 
-    train_loader = torch.utils.data.DataLoader()(
+    train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=train_bs,
         shuffle=True,
@@ -84,7 +91,7 @@ def run(fold):
         augmentations=valid_aug
     )
 
-    train_loader = torch.utils.data.DataLoader()(
+    valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
         batch_size=valid_bs,
         shuffle=False,
@@ -101,11 +108,117 @@ def run(fold):
         mode="max"
     )
 
-    model, optimizer = amp.initialize(
-        model,
-        optimizer,
-        opt_level="01",
-        verbosity=0
+    #scaler = amp.GradScaler()
+
+    # model, optimizer = amp.initialize(
+    #     model,
+    #     optimizer,
+    #     opt_level="01",
+    #     verbosity=0
+    # )
+
+    es = EarlyStopping(patience=5, mode="max")
+    for epoch in range(epochs):
+        training_loss = Engine.train(
+            train_loader,
+            model,
+            optimizer,
+            device=device
+        )
+        predictions, valid_loss = Engine.evaluate(
+            valid_loader,
+            model,
+            device=device
+        )
+        predictions = np.vstack(predictions).ravel()
+        #auc = metrics.roc_auc_score(valid_targets, predictions)
+        auc = metrics.roc_auc_score(valid_targets, predictions)
+        scheduler.step(auc)
+        #print(f"epoch= {epoch}, AUC= {auc}")
+        print(f"Epoch = {epoch}, AUC = {auc}")
+        es(auc, model, os.path.join(model_path, f"model{fold}.bin"))
+        if es.early_stop:
+            print("early stopping")
+            break
+
+
+def predict(fold):
+    test_data_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/test_resized"
+    model_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch"
+    df_test = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/test.csv")
+    df_test.loc[:, "target"] = 0
+    device = "cuda"
+    epochs = 50
+    test_bs = 16
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.244, 0.255)
+
+    test_aug = albumentations.Compose(
+        [
+            albumentations.Normalize(mean, std, max_pixel_value=255.0, always_apply=True),
+        ]
     )
 
-    
+    test_images = df_test.image_name.values.tolist()
+    test_images = [os.path.join(test_data_path, i + ".jpg") for i in test_images]
+    test_targets = df_train.target.values
+
+
+    test_dataset = ClassificationLoader(
+        image_paths=test_images,
+        targets=test_targets,
+        resize=None,
+        augmentations=valid_aug
+    )
+
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset,
+        batch_size=test_bs,
+        shuffle=False,
+        num_workers=4
+    )
+
+    model = SEResNext50_32x4d(pretrained="imagenet")
+    model.load_state_dict(torch.load(os.path.join(model_path, f"model{fold}.bin")))
+    model.to(device)
+
+    predictions = Engine.predict(
+        test_loader,
+        model,
+        device
+    )
+    return np.vstack((predictions)).ravel()
+
+
+if __name__ == "__main__":
+    train(0)
+    train(1)
+    train(2)
+    train(3)
+    train(4)
+    train(5)
+    train(6)
+    train(7)
+    train(8)
+    train(9)
+
+    p1 = predict(0)
+    p2 = predict(1)
+    p3 = predict(2)
+    p4 = predict(3)
+    p5 = predict(4)
+    p6 = predict(5)
+    p7 = predict(6)
+    p8 = predict(7)
+    p9 = predict(8)
+    p10 = predict(9)
+
+    predictions = (p1+p2+p3+p4+p5+p6+p7+p8+p9+p10)/10
+    sample = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/sample_submission.csv")
+    sample.loc[:, "target"] = predictions
+    sample.to_csv("submission.csv", index=False)
+
+
+
+
+
