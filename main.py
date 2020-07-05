@@ -10,12 +10,13 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
 #from torch.cuda import amp
-#from apex import amp
+from apex import amp
 from sklearn import metrics
 
 from wtfml.data_loaders.image import ClassificationLoader
 from wtfml.utils import EarlyStopping
 from wtfml.engine import Engine
+
 class SEResNext50_32x4d(nn.Module):
     def __init__(self, pretrained="imagenet"):
         super(SEResNext50_32x4d, self).__init__()
@@ -53,6 +54,8 @@ def train(fold):
     train_aug = albumentations.Compose(
         [
             albumentations.Normalize(mean, std, max_pixel_value=255.0, always_apply=True),
+            albumentations.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=15),
+            albumentations.Flip(p=0.5)
         ]
     )
 
@@ -110,12 +113,12 @@ def train(fold):
 
     #scaler = amp.GradScaler()
 
-    # model, optimizer = amp.initialize(
-    #     model,
-    #     optimizer,
-    #     opt_level="01",
-    #     verbosity=0
-    # )
+    model, optimizer = amp.initialize(
+        model,
+        optimizer,
+        opt_level="O1",
+        verbosity=0
+    )
 
     es = EarlyStopping(patience=5, mode="max")
     for epoch in range(epochs):
@@ -123,7 +126,8 @@ def train(fold):
             train_loader,
             model,
             optimizer,
-            device=device
+            device,
+            fp16=True
         )
         predictions, valid_loss = Engine.evaluate(
             valid_loader,
@@ -161,14 +165,14 @@ def predict(fold):
 
     test_images = df_test.image_name.values.tolist()
     test_images = [os.path.join(test_data_path, i + ".jpg") for i in test_images]
-    test_targets = df_train.target.values
+    test_targets = np.zeros(len(test_images))
 
 
     test_dataset = ClassificationLoader(
         image_paths=test_images,
         targets=test_targets,
         resize=None,
-        augmentations=valid_aug
+        augmentations=test_aug
     )
 
     test_loader = torch.utils.data.DataLoader(
@@ -178,45 +182,45 @@ def predict(fold):
         num_workers=4
     )
 
-    model = SEResNext50_32x4d(pretrained="imagenet")
+    model = SEResNext50_32x4d(pretrained=None)
     model.load_state_dict(torch.load(os.path.join(model_path, f"model{fold}.bin")))
     model.to(device)
 
     predictions = Engine.predict(
         test_loader,
         model,
-        device
+        device=device
     )
     return np.vstack((predictions)).ravel()
 
 
 if __name__ == "__main__":
     train(0)
-    train(1)
-    train(2)
-    train(3)
-    train(4)
-    train(5)
-    train(6)
-    train(7)
-    train(8)
-    train(9)
+    # train(1)
+    # train(2)
+    # train(3)
+    # train(4)
+    # train(5)
+    # train(6)
+    # train(7)
+    # train(8)
+    # train(9)
 
-    p1 = predict(0)
-    p2 = predict(1)
-    p3 = predict(2)
-    p4 = predict(3)
-    p5 = predict(4)
-    p6 = predict(5)
-    p7 = predict(6)
-    p8 = predict(7)
-    p9 = predict(8)
-    p10 = predict(9)
-
-    predictions = (p1+p2+p3+p4+p5+p6+p7+p8+p9+p10)/10
-    sample = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/sample_submission.csv")
-    sample.loc[:, "target"] = predictions
-    sample.to_csv("submission.csv", index=False)
+    # p1 = predict(0)
+    # p2 = predict(1)
+    # p3 = predict(2)
+    # p4 = predict(3)
+    # p5 = predict(4)
+    # p6 = predict(5)
+    # p7 = predict(6)
+    # p8 = predict(7)
+    # p9 = predict(8)
+    # p10 = predict(9)
+    #
+    # predictions = (p1+p2+p3+p4+p5+p6+p7+p8+p9+p10)/10
+    # sample = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/sample_submission.csv")
+    # sample.loc[:, "target"] = predictions
+    # sample.to_csv("submission.csv", index=False)
 
 
 
