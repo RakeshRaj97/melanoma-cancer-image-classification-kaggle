@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn import model_selection
 
 if __name__ == "__main__":
-    input_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/"
+    input_path = ""
     df = pd.read_csv(os.path.join(input_path, "train.csv"))
     # create a new column and assign a dummy value (say -1)
     df["kfold"] = -1
