@@ -38,9 +38,9 @@ class SEResNext50_32x4d(nn.Module):
         return out, loss
 
 def train(fold):
-    training_data_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/train_resized"
-    model_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch"
-    df = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/train_folds.csv")
+    training_data_path = ""
+    model_path = ""
+    df = pd.read_csv("")
     device = "cuda"
     epochs = 50
     train_bs = 32
@@ -147,9 +147,9 @@ def train(fold):
 
 
 def predict(fold):
-    test_data_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/test_resized"
-    model_path = "/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch"
-    df_test = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/test.csv")
+    test_data_path = ""
+    model_path = ""
+    df_test = pd.read_csv("")
     df_test.loc[:, "target"] = 0
     device = "cuda"
     epochs = 50
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     # p10 = predict(9)
     #
     # predictions = (p1+p2+p3+p4+p5+p6+p7+p8+p9+p10)/10
-    # sample = pd.read_csv("/fred/oz138/test/kaggle/data/ssim/jpeg/melanoma-cancer-image-classification-kaggle-using-PyTorch/sample_submission.csv")
+    # sample = pd.read_csv("")
     # sample.loc[:, "target"] = predictions
     # sample.to_csv("submission.csv", index=False)
 
