@@ -9,8 +9,8 @@ import pandas as pd
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
-#from torch.cuda import amp
-from apex import amp
+# from torch.cuda import amp
+# from apex import amp
 from sklearn import metrics
 
 from wtfml.data_loaders.image import ClassificationLoader
@@ -38,9 +38,9 @@ class SEResNext50_32x4d(nn.Module):
         return out, loss
 
 def train(fold):
-    training_data_path = ""
-    model_path = ""
-    df = pd.read_csv("")
+    training_data_path = "/train"
+    model_path = "/models"
+    df = pd.read_csv("train_folds.csv")
     device = "cuda"
     epochs = 50
     train_bs = 32
@@ -113,12 +113,12 @@ def train(fold):
 
     #scaler = amp.GradScaler()
 
-    model, optimizer = amp.initialize(
-        model,
-        optimizer,
-        opt_level="O1",
-        verbosity=0
-    )
+    # model, optimizer = amp.initialize(
+    #     model,
+    #     optimizer,
+    #     opt_level="O1",
+    #     verbosity=0
+    # )
 
     es = EarlyStopping(patience=5, mode="max")
     for epoch in range(epochs):
@@ -196,15 +196,15 @@ def predict(fold):
 
 if __name__ == "__main__":
     train(0)
-    # train(1)
-    # train(2)
-    # train(3)
-    # train(4)
-    # train(5)
-    # train(6)
-    # train(7)
-    # train(8)
-    # train(9)
+    train(1)
+    train(2)
+    train(3)
+    train(4)
+    train(5)
+    train(6)
+    train(7)
+    train(8)
+    train(9)
 
     # p1 = predict(0)
     # p2 = predict(1)

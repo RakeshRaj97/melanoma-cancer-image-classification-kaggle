@@ -2,3 +2,4 @@ albumentations
 pretrainedmodels
 torch==1.5.0
 wtfml==0.0.2
+pandas==1.1.4
